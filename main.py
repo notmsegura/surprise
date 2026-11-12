@@ -1,7 +1,29 @@
 import json
 from dataclasses import asdict, dataclass
 from drafter import *
-from js import localStorage
+
+# -----------------------------------------------------------------------------
+# Safe LocalStorage Import (Prevents build failures during GitHub deployment)
+# -----------------------------------------------------------------------------
+try:
+    from js import localStorage
+except ImportError:
+
+    class LocalStorageFallback:
+
+        def __init__(self):
+            self._data = {}
+
+        def setItem(self, key, value):
+            self._data[key] = str(value)
+
+        def getItem(self, key):
+            return self._data.get(key, None)
+
+        def removeItem(self, key):
+            self._data.pop(key, None)
+
+    localStorage = LocalStorageFallback()
 
 # -----------------------------------------------------------------------------
 # Data Models (Isolated Category State & Persistable Dataclasses)
@@ -77,7 +99,7 @@ def load_state() -> State:
         data["ballots"] = reconstructed_ballots
         return State(**data)
     except Exception:
-        # Fallback to fresh State if stored data structure is corrupted
+        # Fallback to fresh State if stored data structure is invalid
         return State()
 
 
@@ -311,9 +333,7 @@ def submit_ballot(
         f"✓ Ballot by Judge {new_ballot.judge_name} submitted successfully!"
     )
 
-    # PERSISTENCE: Save state after successful write action
     save_state(state)
-
     return show_input_ballot_form(state)
 
 
@@ -414,5 +434,4 @@ set_site_information(
     "Speech competition ballot scoring system planning document",
 )
 
-# Start server initialized with saved data from browser storage
 start_server(load_state())
